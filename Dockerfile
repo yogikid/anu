@@ -418,6 +418,7 @@ RUN printf '%s\n' \
 # ============================================
 RUN cat > /usr/local/bin/show-info << 'EOFINFO'
 #!/bin/bash
+
 RED="\033[0;31m"
 GREEN="\033[0;32m"
 YELLOW="\033[0;33m"
@@ -524,6 +525,7 @@ echo ""
 EOFINFO
 
 RUN chmod +x /usr/local/bin/show-info
+
 
 # Custom Bashrc with enhanced info
 RUN printf '%s\n' \
