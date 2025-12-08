@@ -201,14 +201,8 @@ RUN printf '%s\n' \
     '# Update port in server.properties' \
     'if [ -f "server.properties" ]; then' \
     '    sed -i "s/server-port=.*/server-port=$PORT/g" server.properties' \
-    '    sed -i "s/server-portv6=.*/server-portv6=$PORT/g" server.properties' \
     'else' \
     '    echo "server-port=$PORT" > server.properties' \
-    '    echo "server-portv6=$PORT" >> server.properties' \
-    '    echo "server-name=Bedrock Server" >> server.properties' \
-    '    echo "gamemode=survival" >> server.properties' \
-    '    echo "difficulty=normal" >> server.properties' \
-    '    echo "max-players=10" >> server.properties' \
     'fi' \
     '' \
     'echo ""' \
