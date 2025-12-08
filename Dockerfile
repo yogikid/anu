@@ -416,106 +416,115 @@ RUN printf '%s\n' \
 # ============================================
 # ENHANCED SYSTEM INFO SCRIPT
 # ============================================
-RUN printf '%s\n' \
-    '#!/bin/bash' \
-    '' \
-    'RED="\033[0;31m"' \
-    'GREEN="\033[0;32m"' \
-    'YELLOW="\033[0;33m"' \
-    'BLUE="\033[0;34m"' \
-    'MAGENTA="\033[0;35m"' \
-    'CYAN="\033[0;36m"' \
-    'WHITE="\033[1;37m"' \
-    'RESET="\033[0m"' \
-    '' \
-    '# Get system information' \
-    'HOSTNAME=$(hostname)' \
-    'UPTIME=$(uptime -p | sed "s/up //')'"'" \
-    'CPU_CORES=$(nproc)' \
-    'MEM_TOTAL=$(free -h | awk "/Mem:/ {print \$2}")' \
-    'MEM_USED=$(free -h | awk "/Mem:/ {print \$3}")' \
-    'DISK_TOTAL=$(df -h /home/container 2>/dev/null | tail -1 | awk '\''{print $2}'\'')' \
-    'DISK_USED=$(df -h /home/container 2>/dev/null | tail -1 | awk '\''{print $3}'\'')' \
-    'DISK_PERCENT=$(df -h /home/container 2>/dev/null | tail -1 | awk '\''{print $5}'\'')' \
-    '' \
-    '# Get IP addresses' \
-    'PUBLIC_IP=$(curl -s https://api.ipify.org 2>/dev/null || echo "N/A")' \
-    'LOCAL_IP=$(hostname -I | awk '\''{print $1}'\'' 2>/dev/null || echo "N/A")' \
-    '' \
-    '# Get location info' \
-    'if [ "$PUBLIC_IP" != "N/A" ]; then' \
-    '    LOCATION=$(curl -s "https://ipapi.co/${PUBLIC_IP}/json/" 2>/dev/null | jq -r '\''.city + ", " + .region + ", " + .country_name'\'' 2>/dev/null || echo "Unknown")' \
-    '    ISP=$(curl -s "https://ipapi.co/${PUBLIC_IP}/org/" 2>/dev/null || echo "Unknown")' \
-    'else' \
-    '    LOCATION="Unknown"' \
-    '    ISP="Unknown"' \
-    'fi' \
-    '' \
-    '# Check VNC status' \
-    'if pgrep -f Xtigervnc > /dev/null; then' \
-    '    VNC_STATUS="${GREEN}🟢 Running${RESET}"' \
-    'else' \
-    '    VNC_STATUS="${RED}🔴 Stopped${RESET}"' \
-    'fi' \
-    '' \
-    '# Check Minecraft server' \
-    'if pgrep -f bedrock_server > /dev/null; then' \
-    '    MC_STATUS="${GREEN}🟢 Running${RESET}"' \
-    'else' \
-    '    MC_STATUS="${RED}🔴 Stopped${RESET}"' \
-    'fi' \
-    '' \
-    'clear' \
-    'echo -e "${CYAN}╔══════════════════════════════════════════════════════════════════╗${RESET}"' \
-    'echo -e "${CYAN}║${RESET}     ${WHITE}VNC Desktop Container - Office & Development Suite${RESET}         ${CYAN}║${RESET}"' \
-    'echo -e "${CYAN}╚══════════════════════════════════════════════════════════════════╝${RESET}"' \
-    'echo ""' \
-    'echo -e "${GREEN}📊 System Information${RESET}"' \
-    'echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${RESET}"' \
-    'echo -e "   Hostname:    ${YELLOW}${HOSTNAME}${RESET}"' \
-    'echo -e "   Uptime:      ${YELLOW}${UPTIME}${RESET}"' \
-    'echo -e "   CPU:         ${YELLOW}${CPU_CORES} cores${RESET}"' \
-    'echo -e "   Memory:      ${YELLOW}${MEM_USED} / ${MEM_TOTAL}${RESET}"' \
-    'echo -e "   Disk:        ${YELLOW}${DISK_USED} / ${DISK_TOTAL} (${DISK_PERCENT})${RESET}"' \
-    'echo ""' \
-    'echo -e "${GREEN}🌐 Network Information${RESET}"' \
-    'echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${RESET}"' \
-    'echo -e "   Public IP:   ${YELLOW}${PUBLIC_IP}${RESET}"' \
-    'echo -e "   Local IP:    ${YELLOW}${LOCAL_IP}${RESET}"' \
-    'echo -e "   Location:    ${YELLOW}${LOCATION}${RESET}"' \
-    'echo -e "   ISP:         ${YELLOW}${ISP}${RESET}"' \
-    'echo ""' \
-    'echo -e "${GREEN}🎮 Services Status${RESET}"' \
-    'echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${RESET}"' \
-    'echo -e "   VNC Desktop:        ${VNC_STATUS}"' \
-    'echo -e "   Minecraft Server:   ${MC_STATUS}"' \
-    'echo ""' \
-    'echo -e "${GREEN}🖥️ Desktop Commands${RESET}"' \
-    'echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${RESET}"' \
-    'echo -e "   ${CYAN}desktop [port]${RESET}       - Start VNC Desktop (default: 5901)"' \
-    'echo -e "   ${CYAN}stop-desktop${RESET}         - Stop VNC Desktop"' \
-    'echo -e "   ${CYAN}list-desktop${RESET}         - List active VNC sessions"' \
-    'echo -e "   ${CYAN}restart-desktop${RESET}      - Restart VNC Desktop"' \
-    'echo ""' \
-    'echo -e "${GREEN}🎮 Minecraft Commands${RESET}"' \
-    'echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${RESET}"' \
-    'echo -e "   ${CYAN}start-mc [port]${RESET}      - Start Minecraft Bedrock (default: 19132)"' \
-    'echo ""' \
-    'echo -e "${GREEN}📦 Installed Applications${RESET}"' \
-    'echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${RESET}"' \
-    'echo -e "   • ${YELLOW}Firefox Browser${RESET}               • ${YELLOW}Rclone Cloud Sync${RESET}"' \
-    'echo -e "   • ${YELLOW}WPS Office Suite${RESET}              • ${YELLOW}Git & Git LFS${RESET}"' \
-    'echo -e "   • ${YELLOW}Node.js $(node --version 2>/dev/null || echo "N/A")${RESET}              • ${YELLOW}Python $(python --version 2>&1 | awk '\''{print $2}'\'')${RESET}"' \
-    'echo -e "   • ${YELLOW}Go $(go version 2>/dev/null | awk '\''{print $3}'\'' | sed '\''s/go//'\'')${RESET}                 • ${YELLOW}Bun $(bun --version 2>/dev/null || echo "N/A")${RESET}"' \
-    'echo ""' \
-    'echo -e "${GREEN}🔧 Useful Commands${RESET}"' \
-    'echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${RESET}"' \
-    'echo -e "   ${CYAN}neofetch${RESET}             - System information"' \
-    'echo -e "   ${CYAN}htop${RESET}                 - Process monitor"' \
-    'echo -e "   ${CYAN}rclone config${RESET}        - Configure cloud storage"' \
-    'echo ""' \
-    > /usr/local/bin/show-info && \
-    chmod +x /usr/local/bin/show-info
+RUN cat > /usr/local/bin/show-info << 'EOFINFO'
+#!/bin/bash
+
+RED="\033[0;31m"
+GREEN="\033[0;32m"
+YELLOW="\033[0;33m"
+BLUE="\033[0;34m"
+MAGENTA="\033[0;35m"
+CYAN="\033[0;36m"
+WHITE="\033[1;37m"
+RESET="\033[0m"
+
+# Get system information
+HOSTNAME=$(hostname)
+UPTIME=$(uptime -p | sed 's/up //')
+CPU_CORES=$(nproc)
+MEM_TOTAL=$(free -h | awk '/Mem:/ {print $2}')
+MEM_USED=$(free -h | awk '/Mem:/ {print $3}')
+DISK_TOTAL=$(df -h /home/container 2>/dev/null | tail -1 | awk '{print $2}')
+DISK_USED=$(df -h /home/container 2>/dev/null | tail -1 | awk '{print $3}')
+DISK_PERCENT=$(df -h /home/container 2>/dev/null | tail -1 | awk '{print $5}')
+
+# Get IP addresses
+PUBLIC_IP=$(curl -s https://api.ipify.org 2>/dev/null || echo "N/A")
+LOCAL_IP=$(hostname -I | awk '{print $1}' 2>/dev/null || echo "N/A")
+
+# Get location info
+if [ "$PUBLIC_IP" != "N/A" ]; then
+    LOCATION=$(curl -s "https://ipapi.co/${PUBLIC_IP}/city/" 2>/dev/null || echo "Unknown")
+    COUNTRY=$(curl -s "https://ipapi.co/${PUBLIC_IP}/country_name/" 2>/dev/null || echo "Unknown")
+    ISP=$(curl -s "https://ipapi.co/${PUBLIC_IP}/org/" 2>/dev/null || echo "Unknown")
+    [ "$LOCATION" = "Unknown" ] || LOCATION="$LOCATION, $COUNTRY"
+else
+    LOCATION="Unknown"
+    ISP="Unknown"
+fi
+
+# Check VNC status
+if pgrep -f Xtigervnc > /dev/null 2>&1; then
+    VNC_STATUS="${GREEN}🟢 Running${RESET}"
+else
+    VNC_STATUS="${RED}🔴 Stopped${RESET}"
+fi
+
+# Check Minecraft server
+if pgrep -f bedrock_server > /dev/null 2>&1; then
+    MC_STATUS="${GREEN}🟢 Running${RESET}"
+else
+    MC_STATUS="${RED}🔴 Stopped${RESET}"
+fi
+
+# Get versions
+NODE_VER=$(node --version 2>/dev/null || echo "N/A")
+PYTHON_VER=$(python --version 2>&1 | awk '{print $2}')
+GO_VER=$(go version 2>/dev/null | awk '{print $3}' | sed 's/go//')
+BUN_VER=$(bun --version 2>/dev/null || echo "N/A")
+
+clear
+echo -e "${CYAN}╔══════════════════════════════════════════════════════════════════╗${RESET}"
+echo -e "${CYAN}║${RESET}     ${WHITE}VNC Desktop Container - Office & Development Suite${RESET}         ${CYAN}║${RESET}"
+echo -e "${CYAN}╚══════════════════════════════════════════════════════════════════╝${RESET}"
+echo ""
+echo -e "${GREEN}📊 System Information${RESET}"
+echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${RESET}"
+echo -e "   Hostname:    ${YELLOW}${HOSTNAME}${RESET}"
+echo -e "   Uptime:      ${YELLOW}${UPTIME}${RESET}"
+echo -e "   CPU:         ${YELLOW}${CPU_CORES} cores${RESET}"
+echo -e "   Memory:      ${YELLOW}${MEM_USED} / ${MEM_TOTAL}${RESET}"
+echo -e "   Disk:        ${YELLOW}${DISK_USED} / ${DISK_TOTAL} (${DISK_PERCENT})${RESET}"
+echo ""
+echo -e "${GREEN}🌐 Network Information${RESET}"
+echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${RESET}"
+echo -e "   Public IP:   ${YELLOW}${PUBLIC_IP}${RESET}"
+echo -e "   Local IP:    ${YELLOW}${LOCAL_IP}${RESET}"
+echo -e "   Location:    ${YELLOW}${LOCATION}${RESET}"
+echo -e "   ISP:         ${YELLOW}${ISP}${RESET}"
+echo ""
+echo -e "${GREEN}🎮 Services Status${RESET}"
+echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${RESET}"
+echo -e "   VNC Desktop:        ${VNC_STATUS}"
+echo -e "   Minecraft Server:   ${MC_STATUS}"
+echo ""
+echo -e "${GREEN}🖥️  Desktop Commands${RESET}"
+echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${RESET}"
+echo -e "   ${CYAN}desktop [port]${RESET}       - Start VNC Desktop (default: 5901)"
+echo -e "   ${CYAN}stop-desktop${RESET}         - Stop VNC Desktop"
+echo -e "   ${CYAN}list-desktop${RESET}         - List active VNC sessions"
+echo -e "   ${CYAN}restart-desktop${RESET}      - Restart VNC Desktop"
+echo ""
+echo -e "${GREEN}🎮 Minecraft Commands${RESET}"
+echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${RESET}"
+echo -e "   ${CYAN}start-mc [port]${RESET}      - Start Minecraft Bedrock (default: 19132)"
+echo ""
+echo -e "${GREEN}📦 Installed Applications${RESET}"
+echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${RESET}"
+echo -e "   • ${YELLOW}Firefox Browser${RESET}               • ${YELLOW}Rclone Cloud Sync${RESET}"
+echo -e "   • ${YELLOW}WPS Office Suite${RESET}              • ${YELLOW}Git & Git LFS${RESET}"
+echo -e "   • ${YELLOW}Node.js ${NODE_VER}${RESET}              • ${YELLOW}Python ${PYTHON_VER}${RESET}"
+echo -e "   • ${YELLOW}Go ${GO_VER}${RESET}                 • ${YELLOW}Bun ${BUN_VER}${RESET}"
+echo ""
+echo -e "${GREEN}🔧 Useful Commands${RESET}"
+echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${RESET}"
+echo -e "   ${CYAN}neofetch${RESET}             - System information"
+echo -e "   ${CYAN}htop${RESET}                 - Process monitor"
+echo -e "   ${CYAN}rclone config${RESET}        - Configure cloud storage"
+echo ""
+EOFINFO
+
+RUN chmod +x /usr/local/bin/show-info
 
 # Custom Bashrc with enhanced info
 RUN printf '%s\n' \
