@@ -1,22 +1,21 @@
-name: Build Docker Image
+name: Build & Push Docker Image
 
 on:
-  push:
-    branches: [ "main" ]
+  workflow_dispatch:
 
 jobs:
   build:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout repo
+      - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Build image
-        run: docker build -t yogikid2/dev-env .
-
       - name: Login Docker Hub
-        run: echo "${{ secrets.DOCKER_TOKEN }}" | docker login -u yogikid2 --password-stdin
+        run: echo "dckr_pat_uKGsPEp3-GD93q7KxVWIIoKVUGA" | docker login -u "yogikid2" --password-stdin
 
-      - name: Push image
-        run: docker push yogikid2/dev-env
+      - name: Build image
+        run: docker build -t yogikid2/dev-env:latest .
+
+      - name: Push
+        run: docker push yogikid2/dev-env:latest
