@@ -1,12 +1,10 @@
 FROM ubuntu:22.04
 
-# Build arguments
 ARG NODE_VERSION=20
 ARG GO_VERSION=1.22.1
 ARG PYTHON_VERSION=3.10
 ARG YQ_VERSION=v4.44.2
 
-# Environment variables
 ENV DEBIAN_FRONTEND=noninteractive \
     TZ=Asia/Jakarta \
     LANG=en_US.UTF-8 \
@@ -21,7 +19,6 @@ ENV DEBIAN_FRONTEND=noninteractive \
 
 ENV PATH=$GO_HOME/bin:$GOPATH/bin:$BUN_INSTALL/bin:/home/container/.local/bin:$PATH
 
-# Install system dependencies + XFCE Desktop + VNC
 RUN apt-get update && apt-get upgrade -y && \
     apt-get install -y --no-install-recommends \
     curl wget git vim nano htop tree unzip zip \
@@ -158,12 +155,11 @@ RUN mkdir -p /home/container /home/container/go /home/container/Documents /home/
     chmod -R 777 /home/container
 
 # ============================================
-# MINECRAFT BEDROCK SERVER SCRIPT (FIXED)
+# MINECRAFT BEDROCK SERVER SCRIPT (AUTO UPDATE)
 # ============================================
 RUN printf '%s\n' \
     '#!/bin/bash' \
     'PORT=${1:-19132}' \
-    'VERSION="1.21.124.2"' \
     'DIR="/home/container/mcpe-$PORT"' \
     '' \
     'RED="\033[0;31m"' \
@@ -176,15 +172,27 @@ RUN printf '%s\n' \
     'echo -e "${CYAN}  Minecraft Bedrock Server Launcher${RESET}"' \
     'echo -e "${CYAN}=========================================${RESET}"' \
     'echo -e "${YELLOW}Port: $PORT${RESET}"' \
-    'echo -e "${YELLOW}Version: $VERSION${RESET}"' \
     'echo ""' \
     '' \
     'mkdir -p "$DIR"' \
     'cd "$DIR" || exit 1' \
     '' \
-    'if [ ! -f "bedrock_server" ]; then' \
-    '    echo -e "${CYAN}📥 Downloading Minecraft Bedrock Server...${RESET}"' \
-    '    wget -U "Mozilla/5.0" -O bedrock.zip "https://www.minecraft.net/bedrockdedicatedserver/bin-linux/bedrock-server-${VERSION}.zip"' \
+    '# Get latest version automatically' \
+    'echo -e "${CYAN}🔍 Checking latest Minecraft Bedrock version...${RESET}"' \
+    'LATEST_VERSION=$(curl -s https://www.minecraft.net/en-us/download/server/bedrock | grep -oP "bedrock-server-\K[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+" | head -1)' \
+    '' \
+    'if [ -z "$LATEST_VERSION" ]; then' \
+    '    echo -e "${RED}❌ Failed to fetch latest version!${RESET}"' \
+    '    echo -e "${YELLOW}Using fallback version: 1.21.50.7${RESET}"' \
+    '    LATEST_VERSION="1.21.50.7"' \
+    'else' \
+    '    echo -e "${GREEN}✅ Latest version: $LATEST_VERSION${RESET}"' \
+    'fi' \
+    '' \
+    'if [ ! -f "bedrock_server" ] || [ ! -f ".version" ] || [ "$(cat .version 2>/dev/null)" != "$LATEST_VERSION" ]; then' \
+    '    echo -e "${CYAN}📥 Downloading Minecraft Bedrock Server v$LATEST_VERSION...${RESET}"' \
+    '    rm -f bedrock.zip' \
+    '    wget -U "Mozilla/5.0" -O bedrock.zip "https://www.minecraft.net/bedrockdedicatedserver/bin-linux/bedrock-server-${LATEST_VERSION}.zip"' \
     '    ' \
     '    if [ $? -ne 0 ]; then' \
     '        echo -e "${RED}❌ Download failed!${RESET}"' \
@@ -195,7 +203,10 @@ RUN printf '%s\n' \
     '    unzip -o bedrock.zip' \
     '    rm bedrock.zip' \
     '    chmod +x bedrock_server' \
+    '    echo "$LATEST_VERSION" > .version' \
     '    echo -e "${GREEN}✅ Download complete!${RESET}"' \
+    'else' \
+    '    echo -e "${GREEN}✅ Server already up to date (v$LATEST_VERSION)${RESET}"' \
     'fi' \
     '' \
     '# Update port in server.properties' \
@@ -206,7 +217,7 @@ RUN printf '%s\n' \
     'fi' \
     '' \
     'echo ""' \
-    'echo -e "${GREEN}✅ Starting Minecraft Bedrock Server on Port $PORT...${RESET}"' \
+    'echo -e "${GREEN}✅ Starting Minecraft Bedrock Server v$LATEST_VERSION on Port $PORT...${RESET}"' \
     'echo -e "${CYAN}=========================================${RESET}"' \
     'echo ""' \
     '' \
@@ -214,6 +225,169 @@ RUN printf '%s\n' \
     './bedrock_server' \
     > /usr/local/bin/start-mc && \
     chmod +x /usr/local/bin/start-mc
+
+# PM2 Wrapper for Minecraft
+RUN printf '%s\n' \
+    '#!/bin/bash' \
+    'PORT=${1:-19132}' \
+    'DIR="/home/container/mcpe-$PORT"' \
+    '' \
+    'mkdir -p "$DIR"' \
+    'cd "$DIR" || exit 1' \
+    '' \
+    '# Prepare server first' \
+    'if [ ! -f "bedrock_server" ]; then' \
+    '    echo "Downloading Minecraft server..."' \
+    '    LATEST_VERSION=$(curl -s https://www.minecraft.net/en-us/download/server/bedrock | grep -oP "bedrock-server-\K[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+" | head -1)' \
+    '    [ -z "$LATEST_VERSION" ] && LATEST_VERSION="1.21.50.7"' \
+    '    wget -q -U "Mozilla/5.0" -O bedrock.zip "https://www.minecraft.net/bedrockdedicatedserver/bin-linux/bedrock-server-${LATEST_VERSION}.zip"' \
+    '    unzip -o bedrock.zip > /dev/null 2>&1' \
+    '    rm bedrock.zip' \
+    '    chmod +x bedrock_server' \
+    '    echo "$LATEST_VERSION" > .version' \
+    'fi' \
+    '' \
+    '# Update port' \
+    'if [ -f "server.properties" ]; then' \
+    '    sed -i "s/server-port=.*/server-port=$PORT/g" server.properties' \
+    'else' \
+    '    echo "server-port=$PORT" > server.properties' \
+    'fi' \
+    '' \
+    '# Start with PM2' \
+    'cd "$DIR"' \
+    'export LD_LIBRARY_PATH=.' \
+    'pm2 start ./bedrock_server --name "mc-$PORT" --' \
+    > /usr/local/bin/mc-pm2 && \
+    chmod +x /usr/local/bin/mc-pm2
+
+# ============================================
+# SA-MP GTA SERVER SCRIPT
+# ============================================
+RUN printf '%s\n' \
+    '#!/bin/bash' \
+    'PORT=${1:-7777}' \
+    'DIR="/home/container/samp-$PORT"' \
+    '' \
+    'RED="\033[0;31m"' \
+    'GREEN="\033[0;32m"' \
+    'YELLOW="\033[0;33m"' \
+    'CYAN="\033[0;36m"' \
+    'RESET="\033[0m"' \
+    '' \
+    'echo -e "${CYAN}=========================================${RESET}"' \
+    'echo -e "${CYAN}    SA-MP GTA Server Launcher${RESET}"' \
+    'echo -e "${CYAN}=========================================${RESET}"' \
+    'echo -e "${YELLOW}Port: $PORT${RESET}"' \
+    'echo ""' \
+    '' \
+    'mkdir -p "$DIR"' \
+    'cd "$DIR" || exit 1' \
+    '' \
+    'if [ ! -f "samp03svr" ]; then' \
+    '    echo -e "${CYAN}📥 Downloading SA-MP Server...${RESET}"' \
+    '    wget -O samp.tar.gz "http://files.sa-mp.com/samp037svr_R2-2-1.tar.gz"' \
+    '    ' \
+    '    if [ $? -ne 0 ]; then' \
+    '        echo -e "${RED}❌ Download failed!${RESET}"' \
+    '        exit 1' \
+    '    fi' \
+    '    ' \
+    '    echo -e "${CYAN}📦 Extracting files...${RESET}"' \
+    '    tar -xzf samp.tar.gz --strip-components=1' \
+    '    rm samp.tar.gz' \
+    '    chmod +x samp03svr announce' \
+    '    echo -e "${GREEN}✅ Download complete!${RESET}"' \
+    'fi' \
+    '' \
+    '# Create default server.cfg if not exists' \
+    'if [ ! -f "server.cfg" ]; then' \
+    '    cat > server.cfg << '\''EOF'\''' \
+    'echo Executing Server Config...' \
+    'lanmode 0' \
+    'rcon_password changeme' \
+    'maxplayers 50' \
+    'port '$PORT'' \
+    'hostname SA-MP Server' \
+    'gamemode0 grandlarc 1' \
+    'filterscripts' \
+    'announce 0' \
+    'chatlogging 0' \
+    'weburl www.sa-mp.com' \
+    'onfoot_rate 40' \
+    'incar_rate 40' \
+    'weapon_rate 40' \
+    'stream_distance 300.0' \
+    'stream_rate 1000' \
+    'maxnpc 0' \
+    'logtimeformat [%H:%M:%S]' \
+    'language English' \
+    'EOF' \
+    '    echo -e "${GREEN}✅ Created default server.cfg${RESET}"' \
+    'else' \
+    '    # Update port in existing config' \
+    '    sed -i "s/^port .*/port $PORT/g" server.cfg' \
+    'fi' \
+    '' \
+    'echo ""' \
+    'echo -e "${GREEN}✅ Starting SA-MP Server on Port $PORT...${RESET}"' \
+    'echo -e "${CYAN}=========================================${RESET}"' \
+    'echo ""' \
+    '' \
+    './samp03svr' \
+    > /usr/local/bin/start-samp && \
+    chmod +x /usr/local/bin/start-samp
+
+# PM2 Wrapper for SA-MP
+RUN printf '%s\n' \
+    '#!/bin/bash' \
+    'PORT=${1:-7777}' \
+    'DIR="/home/container/samp-$PORT"' \
+    '' \
+    'mkdir -p "$DIR"' \
+    'cd "$DIR" || exit 1' \
+    '' \
+    '# Prepare server first' \
+    'if [ ! -f "samp03svr" ]; then' \
+    '    echo "Downloading SA-MP server..."' \
+    '    wget -q -O samp.tar.gz "http://files.sa-mp.com/samp037svr_R2-2-1.tar.gz"' \
+    '    tar -xzf samp.tar.gz --strip-components=1 > /dev/null 2>&1' \
+    '    rm samp.tar.gz' \
+    '    chmod +x samp03svr announce' \
+    'fi' \
+    '' \
+    '# Create/update server.cfg' \
+    'if [ ! -f "server.cfg" ]; then' \
+    '    cat > server.cfg << '\''EOF'\''' \
+    'echo Executing Server Config...' \
+    'lanmode 0' \
+    'rcon_password changeme' \
+    'maxplayers 50' \
+    'port '$PORT'' \
+    'hostname SA-MP Server' \
+    'gamemode0 grandlarc 1' \
+    'filterscripts' \
+    'announce 0' \
+    'chatlogging 0' \
+    'weburl www.sa-mp.com' \
+    'onfoot_rate 40' \
+    'incar_rate 40' \
+    'weapon_rate 40' \
+    'stream_distance 300.0' \
+    'stream_rate 1000' \
+    'maxnpc 0' \
+    'logtimeformat [%H:%M:%S]' \
+    'language English' \
+    'EOF' \
+    'else' \
+    '    sed -i "s/^port .*/port $PORT/g" server.cfg' \
+    'fi' \
+    '' \
+    '# Start with PM2' \
+    'cd "$DIR"' \
+    'pm2 start ./samp03svr --name "samp-$PORT"' \
+    > /usr/local/bin/samp-pm2 && \
+    chmod +x /usr/local/bin/samp-pm2
 
 # ============================================
 # XFCE Configuration
@@ -352,7 +526,7 @@ RUN printf '%s\n' \
     '    echo ""' \
     '    echo -e "${GREEN}✅ VNC Server Started Successfully!${RESET}"' \
     '    echo -e "${CYAN}📡 Connect to: YOUR_IP:$PORT${RESET}"' \
-    '    echo -e "${CYAN}🔑 Password: $VNC_PASS${RESET}"' \
+    '    echo -e "${CYAN}🔐 Password: $VNC_PASS${RESET}"' \
     '    echo ""' \
     '    ' \
     '    # Keep container alive and show logs' \
@@ -385,9 +559,9 @@ RUN printf '%s\n' \
 # List Desktop
 RUN printf '%s\n' \
     '#!/bin/bash' \
-    'echo "═══════════════════════════════════════"' \
+    'echo "╔═══════════════════════════════════════╗"' \
     'echo "       Active VNC Sessions"' \
-    'echo "═══════════════════════════════════════"' \
+    'echo "╚═══════════════════════════════════════╝"' \
     'if pgrep -f Xtigervnc > /dev/null; then' \
     '    vncserver -list 2>/dev/null || echo "VNC is running on :1"' \
     'else' \
@@ -461,6 +635,13 @@ RUN printf '%s\n' \
 '    MC_STATUS="${RED}🔴 Stopped${RESET}"' \
 'fi' \
 '' \
+'# Check SA-MP server' \
+'if pgrep -f samp03svr > /dev/null 2>&1; then' \
+'    SAMP_STATUS="${GREEN}🟢 Running${RESET}"' \
+'else' \
+'    SAMP_STATUS="${RED}🔴 Stopped${RESET}"' \
+'fi' \
+'' \
 '# Get versions' \
 'NODE_VER=$(node --version 2>/dev/null || echo "N/A")' \
 'PYTHON_VER=$(python --version 2>&1 | awk "{print \$2}")' \
@@ -468,12 +649,12 @@ RUN printf '%s\n' \
 'BUN_VER=$(bun --version 2>/dev/null || echo "N/A")' \
 '' \
 'clear' \
-'echo -e "${CYAN}╔══════════════════════════════════════════════════════════════════╗${RESET}"' \
+'echo -e "${CYAN}╔═══════════════════════════════════════════════════════════════╗${RESET}"' \
 'echo -e "${CYAN}║${RESET}     ${WHITE}VNC Desktop Container - Office & Development Suite${RESET}         ${CYAN}║${RESET}"' \
-'echo -e "${CYAN}╚══════════════════════════════════════════════════════════════════╝${RESET}"' \
+'echo -e "${CYAN}╚═══════════════════════════════════════════════════════════════╝${RESET}"' \
 'echo ""' \
 'echo -e "${GREEN}📊 System Information${RESET}"' \
-'echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${RESET}"' \
+'echo -e "${CYAN}─────────────────────────────────────────────────────────────────${RESET}"' \
 'echo -e "   Hostname:    ${YELLOW}${HOSTNAME}${RESET}"' \
 'echo -e "   Uptime:      ${YELLOW}${UPTIME}${RESET}"' \
 'echo -e "   CPU:         ${YELLOW}${CPU_CORES} cores${RESET}"' \
@@ -481,37 +662,44 @@ RUN printf '%s\n' \
 'echo -e "   Disk:        ${YELLOW}${DISK_USED} / ${DISK_TOTAL} (${DISK_PERCENT})${RESET}"' \
 'echo ""' \
 'echo -e "${GREEN}🌐 Network Information${RESET}"' \
-'echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${RESET}"' \
+'echo -e "${CYAN}─────────────────────────────────────────────────────────────────${RESET}"' \
 'echo -e "   Public IP:   ${YELLOW}${PUBLIC_IP}${RESET}"' \
 'echo -e "   Local IP:    ${YELLOW}${LOCAL_IP}${RESET}"' \
 'echo -e "   Location:    ${YELLOW}${LOCATION}${RESET}"' \
 'echo -e "   ISP:         ${YELLOW}${ISP}${RESET}"' \
 'echo ""' \
 'echo -e "${GREEN}🎮 Services Status${RESET}"' \
-'echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${RESET}"' \
+'echo -e "${CYAN}─────────────────────────────────────────────────────────────────${RESET}"' \
 'echo -e "   VNC Desktop:        ${VNC_STATUS}"' \
 'echo -e "   Minecraft Server:   ${MC_STATUS}"' \
+'echo -e "   SA-MP Server:       ${SAMP_STATUS}"' \
 'echo ""' \
 'echo -e "${GREEN}🖥️  Desktop Commands${RESET}"' \
-'echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${RESET}"' \
+'echo -e "${CYAN}─────────────────────────────────────────────────────────────────${RESET}"' \
 'echo -e "   ${CYAN}desktop [port]${RESET}       - Start VNC Desktop (default: 5901)"' \
 'echo -e "   ${CYAN}stop-desktop${RESET}         - Stop VNC Desktop"' \
 'echo -e "   ${CYAN}list-desktop${RESET}         - List active VNC sessions"' \
 'echo -e "   ${CYAN}restart-desktop${RESET}      - Restart VNC Desktop"' \
 'echo ""' \
-'echo -e "${GREEN}🎮 Minecraft Commands${RESET}"' \
-'echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${RESET}"' \
+'echo -e "${GREEN}🎮 Game Server Commands${RESET}"' \
+'echo -e "${CYAN}─────────────────────────────────────────────────────────────────${RESET}"' \
 'echo -e "   ${CYAN}start-mc [port]${RESET}      - Start Minecraft Bedrock (default: 19132)"' \
+'echo -e "   ${CYAN}start-samp [port]${RESET}    - Start SA-MP GTA Server (default: 7777)"' \
+'echo -e "   ${CYAN}mc-pm2 [port]${RESET}        - Start Minecraft with PM2 (background)"' \
+'echo -e "   ${CYAN}samp-pm2 [port]${RESET}      - Start SA-MP with PM2 (background)"' \
+'echo -e "   ${CYAN}pm2 list${RESET}             - Show all running PM2 processes"' \
+'echo -e "   ${CYAN}pm2 logs${RESET}             - Show PM2 logs"' \
+'echo -e "   ${CYAN}pm2 stop all${RESET}         - Stop all PM2 processes"' \
 'echo ""' \
 'echo -e "${GREEN}📦 Installed Applications${RESET}"' \
-'echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${RESET}"' \
+'echo -e "${CYAN}─────────────────────────────────────────────────────────────────${RESET}"' \
 'echo -e "   • ${YELLOW}Firefox Browser${RESET}               • ${YELLOW}Rclone Cloud Sync${RESET}"' \
 'echo -e "   • ${YELLOW}WPS Office Suite${RESET}              • ${YELLOW}Git & Git LFS${RESET}"' \
 'echo -e "   • ${YELLOW}Node.js ${NODE_VER}${RESET}              • ${YELLOW}Python ${PYTHON_VER}${RESET}"' \
 'echo -e "   • ${YELLOW}Go ${GO_VER}${RESET}                 • ${YELLOW}Bun ${BUN_VER}${RESET}"' \
 'echo ""' \
 'echo -e "${GREEN}🔧 Useful Commands${RESET}"' \
-'echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${RESET}"' \
+'echo -e "${CYAN}─────────────────────────────────────────────────────────────────${RESET}"' \
 'echo -e "   ${CYAN}neofetch${RESET}             - System information"' \
 'echo -e "   ${CYAN}htop${RESET}                 - Process monitor"' \
 'echo -e "   ${CYAN}rclone config${RESET}        - Configure cloud storage"' \
@@ -540,8 +728,10 @@ RUN printf '%s\n' \
     'console.log("╚═══════════════════════════════════════════════════════╝");' \
     'console.log("");' \
     'console.log("🖥️  Start Desktop:    desktop 5901");' \
-    'console.log("🎮  Start Minecraft:  start-mc 19132");' \
+    'console.log("🎮  Start Minecraft:  start-mc 19132  | mc-pm2 19132");' \
+    'console.log("🚗  Start SA-MP:      start-samp 7777 | samp-pm2 7777");' \
     'console.log("📊  System Info:      show-info");' \
+    'console.log("💡  PM2 Commands:     pm2 list | pm2 logs | pm2 stop all");' \
     'console.log("");' \
     > /home/container/index.js && \
     chmod 644 /home/container/index.js
@@ -592,7 +782,7 @@ RUN printf '%s\n' \
     '# Create default index.js if not exists' \
     'if [ ! -f "/home/container/index.js" ]; then' \
     '    echo "// VNC Desktop Container" > /home/container/index.js' \
-    '    echo "console.log(\"Use: desktop 5901 or start-mc 19132\");" >> /home/container/index.js' \
+    '    echo "console.log(\"Use: desktop 5901 | start-mc 19132 | start-samp 7777\");" >> /home/container/index.js' \
     'fi' \
     '' \
     '# Start bash shell' \
