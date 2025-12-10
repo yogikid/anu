@@ -177,22 +177,26 @@ RUN printf '%s\n' \
     'mkdir -p "$DIR"' \
     'cd "$DIR" || exit 1' \
     '' \
-    '# Get latest version automatically' \
+    '# Get latest version by scraping download button' \
     'echo -e "${CYAN}🔍 Checking latest Minecraft Bedrock version...${RESET}"' \
-    'LATEST_VERSION=$(curl -s https://www.minecraft.net/en-us/download/server/bedrock | grep -oP "bedrock-server-\K[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+" | head -1)' \
+    'DOWNLOAD_URL=$(curl -s -L -H "Accept-Language: en" -H "User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36" https://www.minecraft.net/en-us/download/server/bedrock | grep -oP '\''href="\Khttps://www\.minecraft\.net/bedrockdedicatedserver/bin-linux/bedrock-server-[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+\.zip'\'' | head -1)' \
     '' \
-    'if [ -z "$LATEST_VERSION" ]; then' \
-    '    echo -e "${RED}❌ Failed to fetch latest version!${RESET}"' \
-    '    echo -e "${YELLOW}Using fallback version: 1.21.50.7${RESET}"' \
-    '    LATEST_VERSION="1.21.50.7"' \
+    'if [ -z "$DOWNLOAD_URL" ]; then' \
+    '    echo -e "${RED}❌ Failed to fetch download URL!${RESET}"' \
+    '    echo -e "${YELLOW}Using fallback version: 1.21.130.4${RESET}"' \
+    '    DOWNLOAD_URL="https://www.minecraft.net/bedrockdedicatedserver/bin-linux/bedrock-server-1.21.130.4.zip"' \
     'else' \
-    '    echo -e "${GREEN}✅ Latest version: $LATEST_VERSION${RESET}"' \
+    '    echo -e "${GREEN}✅ Download URL found${RESET}"' \
     'fi' \
+    '' \
+    '# Extract version from URL' \
+    'LATEST_VERSION=$(echo "$DOWNLOAD_URL" | grep -oP "bedrock-server-\K[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+")' \
+    'echo -e "${YELLOW}Version: $LATEST_VERSION${RESET}"' \
     '' \
     'if [ ! -f "bedrock_server" ] || [ ! -f ".version" ] || [ "$(cat .version 2>/dev/null)" != "$LATEST_VERSION" ]; then' \
     '    echo -e "${CYAN}📥 Downloading Minecraft Bedrock Server v$LATEST_VERSION...${RESET}"' \
     '    rm -f bedrock.zip' \
-    '    wget -U "Mozilla/5.0" -O bedrock.zip "https://www.minecraft.net/bedrockdedicatedserver/bin-linux/bedrock-server-${LATEST_VERSION}.zip"' \
+    '    wget -U "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36" -O bedrock.zip "$DOWNLOAD_URL"' \
     '    ' \
     '    if [ $? -ne 0 ]; then' \
     '        echo -e "${RED}❌ Download failed!${RESET}"' \
@@ -238,9 +242,10 @@ RUN printf '%s\n' \
     '# Prepare server first' \
     'if [ ! -f "bedrock_server" ]; then' \
     '    echo "Downloading Minecraft server..."' \
-    '    LATEST_VERSION=$(curl -s https://www.minecraft.net/en-us/download/server/bedrock | grep -oP "bedrock-server-\K[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+" | head -1)' \
-    '    [ -z "$LATEST_VERSION" ] && LATEST_VERSION="1.21.50.7"' \
-    '    wget -q -U "Mozilla/5.0" -O bedrock.zip "https://www.minecraft.net/bedrockdedicatedserver/bin-linux/bedrock-server-${LATEST_VERSION}.zip"' \
+    '    DOWNLOAD_URL=$(curl -s -L -H "Accept-Language: en" -H "User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36" https://www.minecraft.net/en-us/download/server/bedrock | grep -oP '\''href="\Khttps://www\.minecraft\.net/bedrockdedicatedserver/bin-linux/bedrock-server-[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+\.zip'\'' | head -1)' \
+    '    [ -z "$DOWNLOAD_URL" ] && DOWNLOAD_URL="https://www.minecraft.net/bedrockdedicatedserver/bin-linux/bedrock-server-1.21.130.4.zip"' \
+    '    LATEST_VERSION=$(echo "$DOWNLOAD_URL" | grep -oP "bedrock-server-\K[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+")' \
+    '    wget -q -U "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36" -O bedrock.zip "$DOWNLOAD_URL"' \
     '    unzip -o bedrock.zip > /dev/null 2>&1' \
     '    rm bedrock.zip' \
     '    chmod +x bedrock_server' \
